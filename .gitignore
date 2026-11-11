@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+next-env.d.ts
+*.tsbuildinfo
+.env*
+# Real family data (tenant IDs, phones) never goes in this public repo.
+*.xlsx
+*.sql.local
+.claude

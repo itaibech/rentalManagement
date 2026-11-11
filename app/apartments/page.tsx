@@ -2,7 +2,7 @@
 import { EntityPage } from '@/components/EntityPage';
 
 export default function Apartments() {
-  return <EntityPage table="apartments" title="דירות" order="id" ascending fields={[
+  return <EntityPage table="apartments" title="דירות" description="פרטי הדירות, חשבונות חשמל, ארנונה ומים. לחצו על דירה כדי לראות את כל הפרטים." addLabel="הוספת דירה" order="id" ascending fields={[
     { key: 'name', label: 'שם', required: true },
     { key: 'address', label: 'כתובת' },
     { key: 'area_sqm', label: 'שטח (מ״ר)', type: 'number', hideInTable: true },

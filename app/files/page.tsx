@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { ActionIcon, Alert, Anchor, FileInput, Group, Select, Stack, Table, Title } from '@mantine/core';
-import { useLookups } from '@/components/EntityPage';
+import { ActionIcon, Alert, Anchor, Badge, FileInput, Group, Select, Stack, Table, Text, Title } from '@mantine/core';
+import { shortDate, useLookups } from '@/components/EntityPage';
 import { supabase, type Row } from '@/lib/supabase';
 
 // Insurance policies, contracts, receipts. Private bucket "rental"; links are short-lived signed URLs.
@@ -34,18 +34,19 @@ export default function Files() {
   const aptName = (id: unknown) => String(apartments.find((a) => a.id === id)?.name ?? '');
   return (
     <Stack>
-      <Title order={2}>מסמכים</Title>
+      <div><Title order={2}>מסמכים</Title><Text c="dimmed" size="sm">פוליסות ביטוח, חוזי שכירות וקבלות. הקבצים פרטיים ונגישים רק לשותפים.</Text></div>
       <Group align="end">
         <Select label="דירה" clearable data={apartments.map((a) => ({ value: String(a.id), label: String(a.name) }))} value={apartment} onChange={setApartment} />
-        <FileInput label="העלאת קובץ (פוליסה, חוזה, קבלה)" placeholder="בחירת קובץ" onChange={upload} value={null} w={280} />
+        <FileInput label="העלאת קובץ" placeholder="בחירת קובץ להעלאה" onChange={upload} value={null} w={280} />
       </Group>
       {error && <Alert color="red">{error}</Alert>}
+      {rows.length === 0 && <Text c="dimmed" ta="center" py="xl">עדיין לא הועלו מסמכים. בחרו דירה (לא חובה) ואז קובץ.</Text>}
       <Table><Table.Tbody>{rows.map((r) => (
         <Table.Tr key={r.id}>
           <Table.Td><Anchor onClick={() => open(String(r.path))}>{String(r.name)}</Anchor></Table.Td>
-          <Table.Td>{aptName(r.apartment_id)}</Table.Td>
-          <Table.Td>{new Date(String(r.created_at)).toLocaleDateString('he-IL')}</Table.Td>
-          <Table.Td><ActionIcon color="red" variant="subtle" onClick={() => remove(r)} aria-label="מחיקה">✕</ActionIcon></Table.Td>
+          <Table.Td>{r.apartment_id ? <Badge variant="light" color="sand" radius="sm">{aptName(r.apartment_id)}</Badge> : null}</Table.Td>
+          <Table.Td>{shortDate(r.created_at)}</Table.Td>
+          <Table.Td><ActionIcon color="red" variant="subtle" onClick={() => remove(r)} aria-label={`מחיקת ${r.name}`}>✕</ActionIcon></Table.Td>
         </Table.Tr>
       ))}</Table.Tbody></Table>
     </Stack>

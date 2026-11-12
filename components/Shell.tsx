@@ -68,7 +68,7 @@ function Frame({ email, children }: { email: string; children: ReactNode }) {
 }
 
 function SignIn() {
-  const signIn = () => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } });
+  const signIn = () => supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}/rentalManagement/` } });
   return (
     <Center h="100vh" p="md">
       <Paper withBorder p="xl" radius="lg" maw={380} w="100%">

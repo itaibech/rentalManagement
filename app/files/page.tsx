@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { PASTE_HINT, storageKey, usePasteFiles } from '@/components/Attachments';
+import { PASTE_HINT, uploadFiles, usePasteFiles } from '@/components/Attachments';
 import { ActionIcon, Alert, Anchor, Badge, FileInput, Group, Select, Stack, Table, Text, Title } from '@mantine/core';
 import { shortDate, useLookups } from '@/components/EntityPage';
 import { supabase, type Row } from '@/lib/supabase';
@@ -16,12 +16,9 @@ export default function Files() {
   }, []);
   useEffect(reload, [reload]);
 
-  const upload = useCallback(async (file: File | null) => {
-    if (!file) return;
-    const path = storageKey(file);
-    const up = await supabase.storage.from('rental').upload(path, file);
-    const ins = up.error ? up : await supabase.from('attachments').insert({ name: file.name, path, apartment_id: apartment ? Number(apartment) : null });
-    setError(ins.error?.message ?? ''); reload();
+  const upload = useCallback(async (files: File[]) => {
+    if (!files.length) return;
+    setError(await uploadFiles(files, { apartment_id: apartment ? Number(apartment) : null })); reload();
   }, [apartment, reload]);
   usePasteFiles(upload);
   const open = async (path: string) => {
@@ -39,7 +36,7 @@ export default function Files() {
       <div><Title order={2}>מסמכים</Title><Text c="dimmed" size="sm">פוליסות ביטוח, חוזי שכירות וקבלות. הקבצים פרטיים ונגישים רק לשותפים.</Text></div>
       <Group align="end">
         <Select label="דירה" clearable data={apartments.map((a) => ({ value: String(a.id), label: String(a.name) }))} value={apartment} onChange={setApartment} />
-        <FileInput label="העלאת קובץ" placeholder="בחירת קובץ להעלאה" onChange={upload} value={null} w={280} />
+        <FileInput multiple label="העלאת קבצים" placeholder="בחירת קובץ אחד או כמה" onChange={upload} value={[]} w={280} />
       </Group>
       <Text size="xs" c="dimmed">{PASTE_HINT}</Text>
       {error && <Alert color="red">{error}</Alert>}

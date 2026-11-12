@@ -22,3 +22,17 @@ test('recorded transfers zero the balance', () => {
   const transfers = settle(balances(members, [], rents, [])).map((s) => ({ from_member: s.from, to_member: s.to, amount: s.amount }));
   expect([...balances(members, [], rents, transfers).values()].every((v) => Math.abs(v) < 0.01)).toBe(true);
 });
+
+test('monthly rent: every depositor passes money to Lina (Excel pattern)', () => {
+  const rents = [{ amount: 3600, deposited_to: 2 }, { amount: 4200, deposited_to: 1 }, { amount: 4800, deposited_to: 3 }, { amount: 4000, deposited_to: 2 }];
+  const s = settle(balances(members, [], rents, []));
+  expect(s.every((x) => x.to === 4)).toBe(true);
+  expect(s.reduce((a, x) => a + x.amount, 0)).toBeCloseTo(8300, 1); // agorot rounding across three thirds
+});
+
+test('open expense is spread by share and credited to whoever paid it', () => {
+  const rents = [{ amount: 16800, deposited_to: 2 }];
+  const b = balances(members, [{ amount: 400, paid_by: 4 }], rents, []);
+  // Lina paid 400: she is owed half of (16800 - 400) plus her 400 back.
+  expect(b.get(4)).toBeCloseTo(8200 + 400);
+});

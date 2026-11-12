@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { PASTE_HINT, usePasteFiles } from '@/components/Attachments';
 import { ActionIcon, Alert, Anchor, Badge, FileInput, Group, Select, Stack, Table, Text, Title } from '@mantine/core';
 import { shortDate, useLookups } from '@/components/EntityPage';
 import { supabase, type Row } from '@/lib/supabase';
@@ -15,13 +16,14 @@ export default function Files() {
   }, []);
   useEffect(reload, [reload]);
 
-  const upload = async (file: File | null) => {
+  const upload = useCallback(async (file: File | null) => {
     if (!file) return;
     const path = `${crypto.randomUUID()}/${file.name}`;
     const up = await supabase.storage.from('rental').upload(path, file);
     const ins = up.error ? up : await supabase.from('attachments').insert({ name: file.name, path, apartment_id: apartment ? Number(apartment) : null });
     setError(ins.error?.message ?? ''); reload();
-  };
+  }, [apartment, reload]);
+  usePasteFiles(upload);
   const open = async (path: string) => {
     const { data } = await supabase.storage.from('rental').createSignedUrl(path, 60);
     if (data) window.open(data.signedUrl, '_blank');
@@ -39,6 +41,7 @@ export default function Files() {
         <Select label="דירה" clearable data={apartments.map((a) => ({ value: String(a.id), label: String(a.name) }))} value={apartment} onChange={setApartment} />
         <FileInput label="העלאת קובץ" placeholder="בחירת קובץ להעלאה" onChange={upload} value={null} w={280} />
       </Group>
+      <Text size="xs" c="dimmed">{PASTE_HINT}</Text>
       {error && <Alert color="red">{error}</Alert>}
       {rows.length === 0 && <Text c="dimmed" ta="center" py="xl">עדיין לא הועלו מסמכים. בחרו דירה (לא חובה) ואז קובץ.</Text>}
       <Table><Table.Tbody>{rows.map((r) => (

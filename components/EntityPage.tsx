@@ -7,7 +7,7 @@ import { supabase, ils, type Row, type Value } from '@/lib/supabase';
 export interface Field {
   key: string; label: string;
   type?: 'text' | 'number' | 'percent' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'apartment' | 'tenant' | 'select';
-  options?: string[]; hideInTable?: boolean; required?: boolean; default?: Value; hint?: string;
+  options?: string[]; hideInTable?: boolean; noTotal?: boolean; required?: boolean; default?: Value; hint?: string;
 }
 export interface Lookups { members: Row[]; apartments: Row[]; tenants: Row[] }
 
@@ -98,6 +98,7 @@ function DataTable(t: TableProps) {
   return mobile ? <CardList {...t} rows={t.rows} /> : <WideTable {...t} rows={t.rows} />;
 }
 
+const hasTotal = (f: Field) => f.type === 'money' && !f.noTotal;
 const totalOf = (rows: Row[], f: Field) => ils(rows.reduce((s, r) => s + Number(r[f.key] ?? 0), 0));
 // Buttons inside a clickable row must not also open the editor.
 const stop = (node: ReactNode) => <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{node}</div>;
@@ -116,9 +117,9 @@ function WideTable({ fields, rows, lookups, onEdit, actions }: TableProps & { ro
             </Table.Tr>
           ))}
         </Table.Tbody>
-        {shown.some((f) => f.type === 'money') && (
+        {shown.some(hasTotal) && (
           <Table.Tfoot><Table.Tr>{shown.map((f, i) => (
-            <Table.Th key={f.key} ta={alignEnd(f)}>{f.type === 'money' ? totalOf(rows, f) : i === 0 ? `סה״כ (${rows.length})` : ''}</Table.Th>
+            <Table.Th key={f.key} ta={alignEnd(f)}>{hasTotal(f) ? totalOf(rows, f) : i === 0 ? `סה״כ (${rows.length})` : ''}</Table.Th>
           ))}{actions && <Table.Th />}</Table.Tr></Table.Tfoot>
         )}
       </Table>
@@ -129,7 +130,7 @@ function WideTable({ fields, rows, lookups, onEdit, actions }: TableProps & { ro
 // Phones: one card per row, label beside value, nothing scrolls sideways.
 function CardList({ fields, rows, lookups, onEdit, actions }: TableProps & { rows: Row[] }) {
   const [title, ...rest] = fields.filter((f) => !f.hideInTable);
-  const money = fields.filter((f) => f.type === 'money' && !f.hideInTable);
+  const money = fields.filter((f) => hasTotal(f) && !f.hideInTable);
   return (
     <Stack gap="sm">
       {rows.map((r) => (

@@ -60,7 +60,7 @@ export default function Contracts() {
         { key: 'kind', label: 'סוג', type: 'select', options: ['חוזה חדש', 'הארכה'], default: 'חוזה חדש', hint: 'חוזה חדש לדייר חדש, הארכה לדייר קיים' },
         { key: 'start_date', label: 'תחילה', type: 'date', required: true },
         { key: 'end_date', label: 'סיום', type: 'date', required: true },
-        { key: 'rent', label: 'שכר דירה', type: 'money', required: true },
+        { key: 'rent', label: 'שכר דירה', type: 'money', required: true, noTotal: true },
         { key: 'status', label: 'סטטוס', type: 'select', options: ['טיוטה', 'נחתם'], default: 'טיוטה' },
         { key: 'sign_date', label: 'תאריך חתימה', type: 'date', hideInTable: true, default: today() },
         { key: 'first_start', label: 'תאריך החוזה המקורי', type: 'date', hideInTable: true, hint: 'מופיע בהסכם ההארכה ("וביום ... נכרת בין הצדדים הסכם")' },

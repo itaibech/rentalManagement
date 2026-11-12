@@ -68,13 +68,13 @@ function BalanceBoard({ members, bal }: { members: Row[]; bal: Map<number, numbe
           const v = bal.get(m.id) ?? 0, pct = (Math.abs(v) / max) * 50, even = Math.abs(v) < 1;
           return (
             <Group key={m.id} wrap="nowrap" gap="md">
-              <Box w={64}><Text fw={600}>{String(m.name)}</Text><Text size="xs" c="dimmed">{Math.round(Number(m.share) * 100)}%</Text></Box>
+              <Box w={{ base: 48, xs: 64 }}><Text fw={600}>{String(m.name)}</Text><Text size="xs" c="dimmed">{Math.round(Number(m.share) * 100)}%</Text></Box>
               <Box pos="relative" h={14} style={{ flex: 1, borderRadius: 7, background: 'var(--mantine-color-default-hover)' }} aria-hidden>
                 <Box pos="absolute" top={-3} bottom={-3} left="50%" w={2} bg="var(--mantine-color-default-border)" />
                 {!even && <Box pos="absolute" top={0} bottom={0} style={{ borderRadius: 7, width: `${pct}%`,
                   insetInlineStart: v > 0 ? `${50 - pct}%` : '50%', background: `var(--mantine-color-${v > 0 ? 'green' : 'red'}-6)` }} />}
               </Box>
-              <Box w={130} ta="end">
+              <Box w={{ base: 96, xs: 130 }} ta="end">
                 <Text fw={600} c={even ? 'dimmed' : v > 0 ? 'green.7' : 'red.7'} style={{ fontVariantNumeric: 'tabular-nums' }}>{even ? 'מאוזן' : ils(Math.abs(v))}</Text>
                 {!even && <Text size="xs" c="dimmed">{v > 0 ? 'מקבל/ת בחזרה' : 'צריך/ה להעביר'}</Text>}
               </Box>
@@ -109,7 +109,7 @@ function Settlements({ list, name, onDone }: { list: Settlement[]; name: (id: nu
       <Title order={4} mb="sm">העברות שיאזנו את החשבון</Title>
       <Stack gap="xs">
         {list.map((s) => (
-          <Group key={`${s.from}-${s.to}`} justify="space-between" wrap="nowrap">
+          <Group key={`${s.from}-${s.to}`} justify="space-between" gap="xs">
             <Text><b>{name(s.from)}</b> מעביר/ה ל<b>{name(s.to)}</b> <Text span fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>{ils(s.amount)}</Text></Text>
             <Button size="xs" variant="light" loading={busy === `${s.from}-${s.to}`} onClick={() => record(s)}>סימון כהועבר</Button>
           </Group>

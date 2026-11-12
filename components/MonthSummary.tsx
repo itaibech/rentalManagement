@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Card, Group, Stack, Table, Text, Title } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { balances, settle, type Expense, type Member, type Rent, type Settlement, type Transfer } from '@/lib/balance';
 import { ils, supabase, type Row } from '@/lib/supabase';
 
@@ -47,8 +48,23 @@ export function MonthSummary({ month, members, version }: { month: string; membe
 }
 
 function SplitTable({ members, data, bal, net }: { members: Member[]; data: MonthData; bal: Map<number, number>; net: number }) {
+  const mobile = useMediaQuery('(max-width: 48em)');
   const of = (rows: { amount: number }[], key: 'deposited_to' | 'paid_by', id: number) =>
     sum(rows.filter((r) => (r as unknown as Record<string, number>)[key] === id));
+  const label = (v: number) => (Math.abs(v) < 1 ? 'מאוזן' : `${v > 0 ? 'מקבל/ת' : 'מעביר/ה'} ${ils(Math.abs(v))}`);
+  const color = (v: number) => (Math.abs(v) < 1 ? 'dimmed' : v > 0 ? 'green.7' : 'red.7');
+  if (mobile) return (
+    <Stack gap="xs">{members.map((m) => {
+      const v = bal.get(m.id) ?? 0;
+      return (
+        <div key={m.id}>
+          <Group justify="space-between"><Text fw={600}>{m.name} <Text span size="xs" c="dimmed">{Math.round(Number(m.share) * 1000) / 10}%</Text></Text>
+            <Text fw={600} c={color(v)}>{label(v)}</Text></Group>
+          <Text size="xs" c="dimmed">מגיע {ils(Number(m.share) * net)} · צ׳קים {ils(of(data.rents, 'deposited_to', m.id))} · הוצאות {ils(of(data.expenses, 'paid_by', m.id))}</Text>
+        </div>
+      );
+    })}</Stack>
+  );
   return (
     <Table miw={560}>
       <Table.Thead><Table.Tr>
@@ -64,9 +80,7 @@ function SplitTable({ members, data, bal, net }: { members: Member[]; data: Mont
             <Table.Td {...num}>{ils(Number(m.share) * net)}</Table.Td>
             <Table.Td {...num}>{ils(of(data.rents, 'deposited_to', m.id))}</Table.Td>
             <Table.Td {...num}>{ils(of(data.expenses, 'paid_by', m.id))}</Table.Td>
-            <Table.Td {...num} c={Math.abs(v) < 1 ? 'dimmed' : v > 0 ? 'green.7' : 'red.7'} fw={600}>
-              {Math.abs(v) < 1 ? 'מאוזן' : `${v > 0 ? 'מקבל/ת' : 'מעביר/ה'} ${ils(Math.abs(v))}`}
-            </Table.Td>
+            <Table.Td {...num} c={color(v)} fw={600}>{label(v)}</Table.Td>
           </Table.Tr>
         );
       })}</Table.Tbody>
@@ -100,7 +114,7 @@ function Transfers({ list, members, data, onDone }: { list: Settlement[]; member
     <Stack gap={6}>
       <Text fw={600}>מי מעביר למי</Text>
       {list.map((s) => (
-        <Group key={`${s.from}-${s.to}`} justify="space-between" wrap="nowrap">
+        <Group key={`${s.from}-${s.to}`} justify="space-between" gap="xs">
           <Text><b>{name(s.from)}</b> מעביר/ה ל<b>{name(s.to)}</b> <Text span fw={600} {...num}>{ils(s.amount)}</Text></Text>
           <Button size="xs" variant="light" loading={busy === `${s.from}-${s.to}`} onClick={() => record(s)}>סימון כהועבר</Button>
         </Group>

@@ -1,11 +1,12 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, Badge, Button, Checkbox, Group, Modal, NumberInput, ScrollArea, Select, Skeleton, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { Alert, Badge, Box, Button, Checkbox, Group, Modal, NumberInput, Paper, ScrollArea, Select, Skeleton, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { supabase, ils, type Row, type Value } from '@/lib/supabase';
 
 export interface Field {
   key: string; label: string;
-  type?: 'text' | 'number' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'apartment' | 'select';
+  type?: 'text' | 'number' | 'percent' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'apartment' | 'select';
   options?: string[]; hideInTable?: boolean; required?: boolean; default?: Value; hint?: string;
 }
 export interface Lookups { members: Row[]; apartments: Row[] }
@@ -26,6 +27,8 @@ const dash = <Text c="dimmed" span>—</Text>;
 function display(f: Field, v: Value, l: Lookups): ReactNode {
   if (v === null || v === undefined || v === '') return dash;
   if (f.type === 'money') return ils(Number(v));
+  if (f.type === 'percent') return `${Math.round(Number(v) * 1000) / 10}%`;
+  if (f.type === 'number') return String(Math.round(Number(v) * 10000) / 10000);
   if (f.type === 'bool') return v ? <Badge variant="light" color="green">כן</Badge> : dash;
   if (f.type === 'date') return shortDate(v);
   if (f.type === 'member') return nameOf(l.members, v);
@@ -35,7 +38,7 @@ function display(f: Field, v: Value, l: Lookups): ReactNode {
 
 interface Props {
   table: string; title: string; description?: string; fields: Field[]; order: string; ascending?: boolean; addLabel?: string;
-  emptyText?: string; notice?: ReactNode; onChange?: () => void; toolbar?: (reload: () => void) => ReactNode; preview?: (values: Partial<Row>, l: Lookups) => ReactNode;
+  emptyText?: string; notice?: ReactNode; onChange?: () => void; rowActions?: (row: Row, reload: () => void) => ReactNode; toolbar?: (reload: () => void) => ReactNode; preview?: (values: Partial<Row>, l: Lookups) => ReactNode;
 }
 
 function useRows(table: string, order: string, ascending: boolean) {
@@ -66,46 +69,81 @@ export function EntityPage(p: Props) {
     <Stack gap="md">
       <Group justify="space-between" align="flex-end">
         <div><Title order={2}>{p.title}</Title>{p.description && <Text c="dimmed" size="sm" maw={640}>{p.description}</Text>}</div>
-        <Group>{p.toolbar?.(reload)}<Button onClick={() => setEditing(blank())}>{p.addLabel ?? 'הוספה'}</Button></Group>
+        <Group wrap="wrap">{p.toolbar?.(reload)}<Button onClick={() => setEditing(blank())}>{p.addLabel ?? 'הוספה'}</Button></Group>
       </Group>
       <Group>
-        <TextInput placeholder="חיפוש" aria-label="חיפוש" value={query} onChange={(e) => setQuery(e.currentTarget.value)} w={260} />
-        {hasApt && <Select placeholder="כל הדירות" aria-label="סינון לפי דירה" clearable w={220}
+        <TextInput placeholder="חיפוש" aria-label="חיפוש" value={query} onChange={(e) => setQuery(e.currentTarget.value)} w={{ base: '100%', xs: 260 }} />
+        {hasApt && <Select placeholder="כל הדירות" aria-label="סינון לפי דירה" clearable w={{ base: '100%', xs: 220 }}
           data={lookups.apartments.map((a) => ({ value: String(a.id), label: String(a.name) }))} value={apt} onChange={setApt} />}
       </Group>
       {p.notice}
       {error && <Alert color="red">{error}</Alert>}
-      <DataTable fields={p.fields} rows={rows === null ? null : filtered} lookups={lookups} onEdit={setEditing}
+      <DataTable fields={p.fields} rows={rows === null ? null : filtered} lookups={lookups} onEdit={setEditing} actions={p.rowActions && ((r) => p.rowActions!(r, reload))}
         empty={rows?.length ? 'אין תוצאות לחיפוש הזה.' : p.emptyText ?? 'עדיין אין כאן כלום. לחצו על הכפתור למעלה כדי להוסיף.'} />
       {editing && <EditModal {...p} lookups={lookups} row={editing} onClose={(changed) => { setEditing(null); if (changed) { reload(); p.onChange?.(); } }} />}
     </Stack>
   );
 }
 
-const alignEnd = (f: Field) => (f.type === 'money' || f.type === 'number' ? 'end' : undefined);
+const alignEnd = (f: Field) => (f.type === 'money' || f.type === 'number' || f.type === 'percent' ? 'end' : undefined);
 
-function DataTable({ fields, rows, lookups, onEdit, empty }: { fields: Field[]; rows: Row[] | null; lookups: Lookups; onEdit: (r: Row) => void; empty: string }) {
+interface TableProps { fields: Field[]; rows: Row[] | null; lookups: Lookups; onEdit: (r: Row) => void; empty: string; actions?: (r: Row) => ReactNode }
+
+function DataTable(t: TableProps) {
+  const mobile = useMediaQuery('(max-width: 48em)');
+  if (t.rows === null) return <Stack gap="xs">{[0, 1, 2, 3].map((i) => <Skeleton key={i} h={36} />)}</Stack>;
+  if (t.rows.length === 0) return <Text c="dimmed" ta="center" py="xl">{t.empty}</Text>;
+  return mobile ? <CardList {...t} rows={t.rows} /> : <WideTable {...t} rows={t.rows} />;
+}
+
+const totalOf = (rows: Row[], f: Field) => ils(rows.reduce((s, r) => s + Number(r[f.key] ?? 0), 0));
+// Buttons inside a clickable row must not also open the editor.
+const stop = (node: ReactNode) => <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{node}</div>;
+
+function WideTable({ fields, rows, lookups, onEdit, actions }: TableProps & { rows: Row[] }) {
   const shown = fields.filter((f) => !f.hideInTable);
-  if (rows === null) return <Stack gap="xs">{[0, 1, 2, 3].map((i) => <Skeleton key={i} h={36} />)}</Stack>;
-  if (rows.length === 0) return <Text c="dimmed" ta="center" py="xl">{empty}</Text>;
   return (
     <ScrollArea>
       <Table striped highlightOnHover stickyHeader miw={640}>
-        <Table.Thead><Table.Tr>{shown.map((f) => <Table.Th key={f.key} ta={alignEnd(f)}>{f.label}</Table.Th>)}</Table.Tr></Table.Thead>
+        <Table.Thead><Table.Tr>{shown.map((f) => <Table.Th key={f.key} ta={alignEnd(f)}>{f.label}</Table.Th>)}{actions && <Table.Th />}</Table.Tr></Table.Thead>
         <Table.Tbody>
           {rows.map((r) => (
             <Table.Tr key={r.id} tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => e.key === 'Enter' && onEdit(r)} style={{ cursor: 'pointer' }}>
               {shown.map((f) => <Table.Td key={f.key} ta={alignEnd(f)}>{display(f, r[f.key], lookups)}</Table.Td>)}
+              {actions && <Table.Td>{stop(actions(r))}</Table.Td>}
             </Table.Tr>
           ))}
         </Table.Tbody>
         {shown.some((f) => f.type === 'money') && (
           <Table.Tfoot><Table.Tr>{shown.map((f, i) => (
-            <Table.Th key={f.key} ta={alignEnd(f)}>{f.type === 'money' ? ils(rows.reduce((s, r) => s + Number(r[f.key] ?? 0), 0)) : i === 0 ? `סה״כ (${rows.length})` : ''}</Table.Th>
-          ))}</Table.Tr></Table.Tfoot>
+            <Table.Th key={f.key} ta={alignEnd(f)}>{f.type === 'money' ? totalOf(rows, f) : i === 0 ? `סה״כ (${rows.length})` : ''}</Table.Th>
+          ))}{actions && <Table.Th />}</Table.Tr></Table.Tfoot>
         )}
       </Table>
     </ScrollArea>
+  );
+}
+
+// Phones: one card per row, label beside value, nothing scrolls sideways.
+function CardList({ fields, rows, lookups, onEdit, actions }: TableProps & { rows: Row[] }) {
+  const [title, ...rest] = fields.filter((f) => !f.hideInTable);
+  const money = fields.filter((f) => f.type === 'money' && !f.hideInTable);
+  return (
+    <Stack gap="sm">
+      {rows.map((r) => (
+        <Paper key={r.id} withBorder p="sm" radius="md" tabIndex={0} onClick={() => onEdit(r)} onKeyDown={(e) => e.key === 'Enter' && onEdit(r)} style={{ cursor: 'pointer' }}>
+          <Text fw={600} mb={4}>{display(title, r[title.key], lookups)}</Text>
+          {rest.map((f) => (
+            <Group key={f.key} justify="space-between" gap="xs" wrap="nowrap" py={2}>
+              <Text size="sm" c="dimmed">{f.label}</Text>
+              <Text size="sm" ta="end" style={{ overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>{display(f, r[f.key], lookups)}</Text>
+            </Group>
+          ))}
+          {actions && <Box mt="xs">{stop(actions(r))}</Box>}
+        </Paper>
+      ))}
+      {money.map((f) => <Group key={f.key} justify="space-between" px="sm"><Text fw={600}>סה״כ {f.label} ({rows.length})</Text><Text fw={600}>{totalOf(rows, f)}</Text></Group>)}
+    </Stack>
   );
 }
 
@@ -148,7 +186,7 @@ function FieldInput({ f, value, lookups, onChange }: { f: Field; value: Value; l
   const common = { label: f.label, required: f.required, description: f.hint };
   const text = (v: string) => onChange(v === '' ? null : v);
   switch (f.type) {
-    case 'number': case 'money':
+    case 'number': case 'money': case 'percent':
       return <NumberInput {...common} value={value === null ? '' : Number(value)} onChange={(v) => onChange(v === '' ? null : Number(v))}
         thousandSeparator prefix={f.type === 'money' ? '₪ ' : undefined} decimalScale={f.type === 'money' ? 2 : 5} inputMode="decimal" />;
     case 'date': return <TextInput {...common} type="date" value={String(value ?? '')} onChange={(e) => text(e.currentTarget.value)} />;

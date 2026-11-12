@@ -36,3 +36,9 @@ export function settle(bal: Map<number, number>): Settlement[] {
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/** Rent for month YYYY-MM is passed on by the 10th of the following month. */
+export const transferDue = (month: string) => {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 10)).toISOString().slice(0, 10);
+};

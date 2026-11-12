@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { balances, settle } from './balance';
+import { balances, settle, transferDue } from './balance';
 
 const members = [
   { id: 1, name: 'איתי', share: 1 / 6 }, { id: 2, name: 'עופר', share: 1 / 6 },
@@ -35,4 +35,9 @@ test('open expense is spread by share and credited to whoever paid it', () => {
   const b = balances(members, [{ amount: 400, paid_by: 4 }], rents, []);
   // Lina paid 400: she is owed half of (16800 - 400) plus her 400 back.
   expect(b.get(4)).toBeCloseTo(8200 + 400);
+});
+
+test('transfer is due on the 10th of the next month', () => {
+  expect(transferDue('2026-11')).toBe('2026-12-10');
+  expect(transferDue('2026-12')).toBe('2027-01-10');
 });

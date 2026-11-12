@@ -1,15 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Anchor, Badge, Box, Button, Card, Group, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Box, Button, Card, Group, SimpleGrid, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
 import { shortDate, useLookups } from '@/components/EntityPage';
-import { balances, settle, type Member, type Settlement } from '@/lib/balance';
+import { balances, settle, transferDue, type Member, type Settlement } from '@/lib/balance';
+import { heDate } from '@/lib/contracts';
 import { ils, supabase, type Row } from '@/lib/supabase';
 
 const day = (offset: number) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
 const monthStart = () => new Date().toISOString().slice(0, 7) + '-01';
 
-interface Data { bal: Map<number, number>; tasks: Row[]; rentThisMonth: number; openExpenses: number }
+interface Data { bal: Map<number, number>; tasks: Row[]; rentThisMonth: number; openExpenses: number; due: string; done: Row[] }
 
 function useDashboard(members: Row[]) {
   const [data, setData] = useState<Data | null>(null);
@@ -23,6 +24,9 @@ function useDashboard(members: Row[]) {
       tasks: (k.data ?? []) as Row[],
       rentThisMonth: (m.data ?? []).reduce((s, x) => s + Number(x.amount), 0),
       openExpenses: (e.data ?? []).reduce((s, x) => s + Number(x.amount), 0),
+      // Latest open rent month decides the deadline (November rent → 10 December).
+      due: transferDue(String((r.data ?? []).map((x) => x.month).sort().pop() ?? monthStart()).slice(0, 7)),
+      done: ((t.data ?? []) as Row[]).sort((a, b) => String(b.date).localeCompare(String(a.date))),
     });
   }, [members]);
   useEffect(() => { if (members.length) load(); }, [members, load]);
@@ -40,7 +44,8 @@ export default function Dashboard() {
     <Stack gap="lg">
       <Title order={2}>מי חייב למי</Title>
       <BalanceBoard members={members} bal={data.bal} />
-      <Settlements list={settle(data.bal)} name={name} onDone={load} />
+      <Settlements list={settle(data.bal)} due={data.due} name={name} onDone={load} />
+      <DoneTransfers rows={data.done} name={name} />
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <Card>
           <Text c="dimmed" size="sm">שכר דירה שנרשם החודש</Text>
@@ -86,12 +91,13 @@ function BalanceBoard({ members, bal }: { members: Row[]; bal: Map<number, numbe
   );
 }
 
-function Settlements({ list, name, onDone }: { list: Settlement[]; name: (id: number) => string; onDone: () => void }) {
+function Settlements({ list, due, name, onDone }: { list: Settlement[]; due: string; name: (id: number) => string; onDone: () => void }) {
   const [busy, setBusy] = useState('');
+  const [date, setDate] = useState(day(0));
   const [confirmClose, setConfirmClose] = useState(false);
   const record = async (s: Settlement) => {
     setBusy(`${s.from}-${s.to}`);
-    await supabase.from('transfers').insert({ from_member: s.from, to_member: s.to, amount: s.amount });
+    await supabase.from('transfers').insert({ from_member: s.from, to_member: s.to, amount: s.amount, date });
     setBusy(''); onDone();
   };
   const close = async () => {
@@ -106,7 +112,8 @@ function Settlements({ list, name, onDone }: { list: Settlement[]; name: (id: nu
   );
   return (
     <Card>
-      <Title order={4} mb="sm">העברות שיאזנו את החשבון</Title>
+      <Group justify="space-between" align="baseline" mb="sm"><Title order={4}>העברות שיאזנו את החשבון</Title>
+        <Badge size="lg" variant="light" color={due < day(0) ? 'red' : 'sea'}>להעביר עד {heDate(due)}</Badge></Group>
       <Stack gap="xs">
         {list.map((s) => (
           <Group key={`${s.from}-${s.to}`} justify="space-between" gap="xs">
@@ -114,7 +121,24 @@ function Settlements({ list, name, onDone }: { list: Settlement[]; name: (id: nu
             <Button size="xs" variant="light" loading={busy === `${s.from}-${s.to}`} onClick={() => record(s)}>סימון כהועבר</Button>
           </Group>
         ))}
+        <TextInput type="date" label="תאריך ההעברה בפועל" description="נשמר עם כל העברה שמסמנים" value={date} onChange={(e) => setDate(e.currentTarget.value || day(0))} maw={220} />
       </Stack>
+    </Card>
+  );
+}
+
+// Transfers already made in the open period, with the actual date.
+function DoneTransfers({ rows, name }: { rows: Row[]; name: (id: number) => string }) {
+  if (!rows.length) return null;
+  return (
+    <Card>
+      <Group justify="space-between" mb="sm"><Title order={4}>העברות שבוצעו</Title><Anchor component={Link} href="/transfers/" size="sm">לכל ההעברות</Anchor></Group>
+      <Stack gap="xs">{rows.map((t) => (
+        <Group key={t.id} justify="space-between" gap="xs">
+          <Text size="sm"><b>{name(Number(t.from_member))}</b> העביר/ה ל<b>{name(Number(t.to_member))}</b> <Text span fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>{ils(Number(t.amount))}</Text></Text>
+          <Text size="sm" c="dimmed">הועבר ב-{heDate(String(t.date))}</Text>
+        </Group>
+      ))}</Stack>
     </Card>
   );
 }

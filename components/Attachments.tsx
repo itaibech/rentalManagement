@@ -20,6 +20,9 @@ export function usePasteFiles(upload: (file: File) => void) {
   }, [upload]);
 }
 
+/** Storage keys must be ASCII; the real (often Hebrew) name is kept in attachments.name. */
+export const storageKey = (file: File) => `${crypto.randomUUID()}.${(file.name.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin'}`;
+
 export const PASTE_HINT = 'אפשר גם להדביק (Ctrl+V / ⌘+V) צילום מסך או קובץ שהועתק.';
 
 /** Files attached to one row (signed contract, check photo, receipt). Private bucket, short-lived links. */
@@ -42,7 +45,7 @@ function AttachmentList({ link, id, apartmentId }: { link: Link; id: number; apa
   const upload = useCallback(async (file: File | null) => {
     if (!file) return;
     setBusy(true);
-    const path = `${crypto.randomUUID()}/${file.name}`;
+    const path = storageKey(file);
     const up = await supabase.storage.from('rental').upload(path, file);
     const ins = up.error ? up : await supabase.from('attachments').insert({ name: file.name, path, [link]: id, apartment_id: apartmentId ?? null });
     setBusy(false); setError(ins.error ? `ההעלאה נכשלה: ${ins.error.message}` : ''); reload();

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { PASTE_HINT, usePasteFiles } from '@/components/Attachments';
+import { PASTE_HINT, storageKey, usePasteFiles } from '@/components/Attachments';
 import { ActionIcon, Alert, Anchor, Badge, FileInput, Group, Select, Stack, Table, Text, Title } from '@mantine/core';
 import { shortDate, useLookups } from '@/components/EntityPage';
 import { supabase, type Row } from '@/lib/supabase';
@@ -18,7 +18,7 @@ export default function Files() {
 
   const upload = useCallback(async (file: File | null) => {
     if (!file) return;
-    const path = `${crypto.randomUUID()}/${file.name}`;
+    const path = storageKey(file);
     const up = await supabase.storage.from('rental').upload(path, file);
     const ins = up.error ? up : await supabase.from('attachments').insert({ name: file.name, path, apartment_id: apartment ? Number(apartment) : null });
     setError(ins.error?.message ?? ''); reload();

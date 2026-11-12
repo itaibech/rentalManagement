@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, Text, TextInput } from '@mantine/core';
 import { EntityPage, useLookups } from '@/components/EntityPage';
 import { MonthSummary } from '@/components/MonthSummary';
+import { AttachmentsButton } from '@/components/Attachments';
 import { supabase } from '@/lib/supabase';
 
 // One row per apartment per month: who the check was deposited to.
@@ -38,6 +39,7 @@ export default function Income() {
         <Button variant="light" loading={busy} onClick={() => generate(reload)}>רישום החודש לכל הדירות</Button>
       </>}
       onChange={bump}
+      rowActions={(r) => <AttachmentsButton link="rent_payment_id" id={r.id} apartmentId={Number(r.apartment_id)} label="צילום צ׳ק / אסמכתא" />}
       notice={<>
         {msg && <Text size="sm" c={msg.startsWith('הרישום נכשל') ? 'red' : 'green.7'} role="status">{msg}</Text>}
         <MonthSummary month={month} members={members} version={version} />

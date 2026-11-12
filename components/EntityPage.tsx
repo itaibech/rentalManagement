@@ -6,16 +6,17 @@ import { supabase, ils, type Row, type Value } from '@/lib/supabase';
 
 export interface Field {
   key: string; label: string;
-  type?: 'text' | 'number' | 'percent' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'apartment' | 'select';
+  type?: 'text' | 'number' | 'percent' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'apartment' | 'tenant' | 'select';
   options?: string[]; hideInTable?: boolean; required?: boolean; default?: Value; hint?: string;
 }
-export interface Lookups { members: Row[]; apartments: Row[] }
+export interface Lookups { members: Row[]; apartments: Row[]; tenants: Row[] }
 
 export function useLookups(): Lookups {
-  const [l, setL] = useState<Lookups>({ members: [], apartments: [] });
+  const [l, setL] = useState<Lookups>({ members: [], apartments: [], tenants: [] });
   useEffect(() => {
-    Promise.all([supabase.from('members').select('*').order('id'), supabase.from('apartments').select('*').order('id')])
-      .then(([m, a]) => setL({ members: (m.data ?? []) as Row[], apartments: (a.data ?? []) as Row[] }));
+    const q = (t: string) => supabase.from(t).select('*').order('id');
+    Promise.all([q('members'), q('apartments'), q('tenants')])
+      .then(([m, a, t]) => setL({ members: (m.data ?? []) as Row[], apartments: (a.data ?? []) as Row[], tenants: (t.data ?? []) as Row[] }));
   }, []);
   return l;
 }
@@ -32,6 +33,7 @@ function display(f: Field, v: Value, l: Lookups): ReactNode {
   if (f.type === 'bool') return v ? <Badge variant="light" color="green">כן</Badge> : dash;
   if (f.type === 'date') return shortDate(v);
   if (f.type === 'member') return nameOf(l.members, v);
+  if (f.type === 'tenant') return nameOf(l.tenants, v);
   if (f.type === 'apartment') return <Badge variant="light" color="sand" radius="sm">{nameOf(l.apartments, v)}</Badge>;
   return String(v);
 }
@@ -192,8 +194,8 @@ function FieldInput({ f, value, lookups, onChange }: { f: Field; value: Value; l
     case 'date': return <TextInput {...common} type="date" value={String(value ?? '')} onChange={(e) => text(e.currentTarget.value)} />;
     case 'textarea': return <Textarea {...common} autosize minRows={2} value={String(value ?? '')} onChange={(e) => text(e.currentTarget.value)} />;
     case 'bool': return <Checkbox label={f.label} description={f.hint} checked={Boolean(value)} onChange={(e) => onChange(e.currentTarget.checked)} />;
-    case 'member': case 'apartment': {
-      const rows = f.type === 'member' ? lookups.members : lookups.apartments;
+    case 'member': case 'apartment': case 'tenant': {
+      const rows = f.type === 'member' ? lookups.members : f.type === 'tenant' ? lookups.tenants : lookups.apartments;
       return <Select {...common} clearable={!f.required} data={rows.map((r) => ({ value: String(r.id), label: String(r.name) }))}
         value={value === null ? null : String(value)} onChange={(v) => onChange(v === null ? null : Number(v))} />;
     }

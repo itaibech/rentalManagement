@@ -13,7 +13,10 @@
     "@mantine/core": "^9.8.0",
     "@mantine/hooks": "^9.8.0",
     "@supabase/supabase-js": "^2.119.0",
+    "docx-preview": "^0.4.1",
+    "docxtemplater": "^3.71.1",
     "next": "^16.4.6",
+    "pizzip": "^3.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

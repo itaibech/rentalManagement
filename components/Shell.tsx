@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 // Grouped by what people come to do: money first, then property records.
 const sections = [
   { title: 'כסף', links: [['/', 'מי חייב למי'], ['/income/', 'שכר דירה חודשי'], ['/expenses/', 'הוצאות'], ['/transfers/', 'העברות']] },
-  { title: 'נכסים', links: [['/apartments/', 'דירות'], ['/tenants/', 'דיירים'], ['/tasks/', 'תזכורות'], ['/files/', 'מסמכים']] },
+  { title: 'נכסים', links: [['/apartments/', 'דירות'], ['/contracts/', 'חוזים'], ['/tenants/', 'דיירים'], ['/tasks/', 'תזכורות'], ['/files/', 'מסמכים']] },
   { title: 'הגדרות', links: [['/members/', 'שותפים']] },
 ] as const;
 

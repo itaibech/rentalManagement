@@ -63,7 +63,7 @@ function AttachmentList({ link, id, apartmentId }: { link: Link; id: number; apa
   usePasteFiles(upload);
   const open = async (path: string) => {
     const { data } = await supabase.storage.from('rental').createSignedUrl(path, 60);
-    if (data) window.open(data.signedUrl, '_blank');
+    if (data) window.open(data.signedUrl, '_blank', 'noopener');
   };
   const remove = async (r: Row) => {
     await supabase.storage.from('rental').remove([String(r.path)]);
@@ -75,7 +75,7 @@ function AttachmentList({ link, id, apartmentId }: { link: Link; id: number; apa
       <Text size="xs" c="dimmed">{PASTE_HINT}</Text>
       {rows.map((r) => (
         <Group key={r.id} justify="space-between" wrap="nowrap">
-          <Anchor onClick={() => open(String(r.path))} style={{ overflowWrap: 'anywhere' }}>{String(r.name)}</Anchor>
+          <Anchor component="button" type="button" onClick={() => open(String(r.path))} style={{ overflowWrap: 'anywhere' }}>{String(r.name)}</Anchor>
           <Group gap="xs" wrap="nowrap"><Text size="xs" c="dimmed">{shortDate(r.created_at)}</Text>
             <ActionIcon color="red" variant="subtle" onClick={() => remove(r)} aria-label={`מחיקת ${r.name}`}>✕</ActionIcon></Group>
         </Group>

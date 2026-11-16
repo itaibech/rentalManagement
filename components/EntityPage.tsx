@@ -157,7 +157,7 @@ function EditModal({ table, fields, lookups, row, preview, onClose }: Props & { 
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const missing = fields.some((f) => f.required && (values[f.key] === null || values[f.key] === undefined || values[f.key] === ''));
+  const missing = fields.filter((f) => f.required && (values[f.key] === null || values[f.key] === undefined || values[f.key] === '')).map((f) => f.label);
   const run = async (op: Op, verb: string) => {
     setBusy(true); const { error: e } = await op; setBusy(false);
     if (e) setError(`ה${verb} נכשלה: ${e.message}`); else onClose(true);
@@ -168,13 +168,13 @@ function EditModal({ table, fields, lookups, row, preview, onClose }: Props & { 
   };
   return (
     <Modal opened onClose={() => onClose(false)} title={<Text fw={600}>{row.id ? 'עריכה' : 'הוספה'}</Text>} size="lg">
-      <form onSubmit={(e) => { e.preventDefault(); if (!missing) save(); }}>
+      <form onSubmit={(e) => { e.preventDefault(); if (missing.length) setError(`חסר למילוי: ${missing.join(', ')}`); else save(); }}>
         <Stack>
           {fields.map((f) => <FieldInput key={f.key} f={f} value={values[f.key] ?? null} lookups={lookups} onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))} />)}
           {preview?.(values, lookups)}
           {error && <Alert color="red">{error}</Alert>}
           <Group justify="space-between">
-            <Button type="submit" loading={busy} disabled={missing}>שמירה</Button>
+            <Button type="submit" loading={busy}>שמירה</Button>
             {row.id && (confirmDelete
               ? <Button color="red" loading={busy} onClick={() => run(supabase.from(table).delete().eq('id', row.id!), 'מחיקה')}>כן, למחוק לצמיתות</Button>
               : <Button color="red" variant="subtle" onClick={() => setConfirmDelete(true)}>מחיקה</Button>)}

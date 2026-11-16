@@ -9,7 +9,7 @@ import { theme } from './theme';
 const plex = IBM_Plex_Sans_Hebrew({ subsets: ['hebrew', 'latin'], weight: ['400', '500', '600', '700'], variable: '--font-plex' });
 
 export const metadata: Metadata = { title: 'ניהול דירות', description: 'ניהול הדירות המשפחתיות: הכנסות, הוצאות והתחשבנות' };
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#1e6091' };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: [{ media: '(prefers-color-scheme: light)', color: '#1e6091' }, { media: '(prefers-color-scheme: dark)', color: '#242424' }] };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

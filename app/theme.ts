@@ -10,6 +10,7 @@ export const theme = createTheme({
   fontFamily: 'var(--font-plex), system-ui, sans-serif',
   headings: { fontFamily: 'var(--font-plex), system-ui, sans-serif', fontWeight: '600' },
   defaultRadius: 'md',
+  respectReducedMotion: true,
   // Ledger feel: amounts line up in columns.
   components: {
     Table: { defaultProps: { verticalSpacing: 'sm', style: { fontVariantNumeric: 'tabular-nums' } } },

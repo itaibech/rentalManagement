@@ -23,7 +23,7 @@ export default function Files() {
   usePasteFiles(upload);
   const open = async (path: string) => {
     const { data } = await supabase.storage.from('rental').createSignedUrl(path, 60);
-    if (data) window.open(data.signedUrl, '_blank');
+    if (data) window.open(data.signedUrl, '_blank', 'noopener');
   };
   const remove = async (r: Row) => {
     if (!confirm(`למחוק את ${r.name}?`)) return;
@@ -43,7 +43,7 @@ export default function Files() {
       {rows.length === 0 && <Text c="dimmed" ta="center" py="xl">עדיין לא הועלו מסמכים. בחרו דירה (לא חובה) ואז קובץ.</Text>}
       <Table><Table.Tbody>{rows.map((r) => (
         <Table.Tr key={r.id}>
-          <Table.Td><Anchor onClick={() => open(String(r.path))}>{String(r.name)}</Anchor></Table.Td>
+          <Table.Td><Anchor component="button" type="button" onClick={() => open(String(r.path))}>{String(r.name)}</Anchor></Table.Td>
           <Table.Td>{r.apartment_id ? <Badge variant="light" color="sand" radius="sm">{aptName(r.apartment_id)}</Badge> : null}</Table.Td>
           <Table.Td>{shortDate(r.created_at)}</Table.Td>
           <Table.Td><ActionIcon color="red" variant="subtle" onClick={() => remove(r)} aria-label={`מחיקת ${r.name}`}>✕</ActionIcon></Table.Td>

@@ -22,8 +22,9 @@ export function download(blob: Blob, name: string) {
 export async function printAsPdf(blob: Blob, title: string) {
   const w = window.open('', '_blank');
   if (!w) throw new Error('הדפדפן חסם חלון חדש. אפשרו חלונות קופצים לאתר ונסו שוב.');
-  w.document.write(`<!doctype html><html lang="he" dir="rtl"><head><title>${title}</title><style>body{margin:0;background:#fff}@media print{.docx-wrapper{background:none!important;padding:0!important}.docx{box-shadow:none!important;margin:0!important}}</style></head><body></body></html>`);
+  w.document.write(`<!doctype html><html lang="he" dir="rtl"><head><style>body{margin:0;background:#fff}@media print{.docx-wrapper{background:none!important;padding:0!important}.docx{box-shadow:none!important;margin:0!important}}</style></head><body></body></html>`);
   w.document.close();
+  w.document.title = title;
   const { renderAsync } = await import('docx-preview');
   await renderAsync(blob, w.document.body, w.document.head, { inWrapper: true, ignoreLastRenderedPageBreak: true });
   setTimeout(() => w.print(), 300);

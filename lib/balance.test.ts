@@ -41,3 +41,14 @@ test('transfer is due on the 10th of the next month', () => {
   expect(transferDue('2026-11')).toBe('2026-12-10');
   expect(transferDue('2026-12')).toBe('2027-01-10');
 });
+
+test('special payment for one partner is owed back by that partner only', () => {
+  const b = balances(members, [{ amount: 300, paid_by: 1, for_members: [4] }], [], []);
+  expect([...b.values()]).toEqual([300, 0, 0, -300]);
+  expect(settle(b)).toEqual([{ from: 4, to: 1, amount: 300 }]);
+});
+
+test('special payment for two partners is split by their shares', () => {
+  const b = balances(members, [{ amount: 400, paid_by: 2, for_members: [1, 4] }], [], []);
+  expect(b.get(1)).toBe(-100); expect(b.get(4)).toBe(-300); expect(b.get(2)).toBe(400);
+});

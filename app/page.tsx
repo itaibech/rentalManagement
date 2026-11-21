@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Anchor, Badge, Box, Button, Card, Group, SimpleGrid, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Box, Button, Card, Group, Modal, MultiSelect, NumberInput, Select, SimpleGrid, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
 import { shortDate, useLookups } from '@/components/EntityPage';
 import { balances, settle, transferDue, type Member, type Settlement } from '@/lib/balance';
 import { heDate } from '@/lib/contracts';
@@ -45,6 +45,7 @@ export default function Dashboard() {
       <Title order={2}>מי חייב למי</Title>
       <BalanceBoard members={members} bal={data.bal} />
       <Settlements list={settle(data.bal)} due={data.due} name={name} onDone={load} />
+      <SpecialPayment members={members} onDone={load} />
       <DoneTransfers rows={data.done} name={name} />
       <SimpleGrid cols={{ base: 1, sm: 2 }}>
         <Card>
@@ -95,9 +96,13 @@ function Settlements({ list, due, name, onDone }: { list: Settlement[]; due: str
   const [busy, setBusy] = useState('');
   const [date, setDate] = useState(day(0));
   const [confirmClose, setConfirmClose] = useState(false);
+  const [paid, setPaid] = useState<Record<string, number>>({}); // partial payments
   const record = async (s: Settlement) => {
-    setBusy(`${s.from}-${s.to}`);
-    await supabase.from('transfers').insert({ from_member: s.from, to_member: s.to, amount: s.amount, date });
+    const key = `${s.from}-${s.to}`, amount = paid[key] ?? s.amount;
+    if (!(amount > 0)) return;
+    setBusy(key);
+    await supabase.from('transfers').insert({ from_member: s.from, to_member: s.to, amount, date, note: amount < s.amount ? 'תשלום חלקי' : null });
+    setPaid(({ [key]: _, ...rest }) => rest);
     setBusy(''); onDone();
   };
   const close = async () => {
@@ -118,10 +123,15 @@ function Settlements({ list, due, name, onDone }: { list: Settlement[]; due: str
         {list.map((s) => (
           <Group key={`${s.from}-${s.to}`} justify="space-between" gap="xs">
             <Text><b>{name(s.from)}</b> מעביר/ה ל<b>{name(s.to)}</b> <Text span fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>{ils(s.amount)}</Text></Text>
-            <Button size="xs" variant="light" loading={busy === `${s.from}-${s.to}`} onClick={() => record(s)}>סימון כהועבר</Button>
+            <Group gap="xs" wrap="nowrap">
+              <NumberInput size="xs" w={120} prefix="₪ " thousandSeparator min={0} max={s.amount} decimalScale={2} inputMode="decimal" aria-label={`סכום שהועבר מ${name(s.from)} ל${name(s.to)}`}
+                value={paid[`${s.from}-${s.to}`] ?? s.amount} onChange={(v) => setPaid((p) => ({ ...p, [`${s.from}-${s.to}`]: Number(v) || 0 }))} />
+              <Button size="xs" variant="light" loading={busy === `${s.from}-${s.to}`} onClick={() => record(s)}>
+                {(paid[`${s.from}-${s.to}`] ?? s.amount) < s.amount ? 'סימון כתשלום חלקי' : 'סימון כהועבר'}</Button>
+            </Group>
           </Group>
         ))}
-        <TextInput type="date" label="תאריך ההעברה בפועל" description="נשמר עם כל העברה שמסמנים" value={date} onChange={(e) => setDate(e.currentTarget.value || day(0))} maw={220} />
+        <TextInput type="date" label="תאריך ההעברה בפועל" description="נשמר עם כל העברה שמסמנים. לתשלום חלקי שנו את הסכום בשורה" value={date} onChange={(e) => setDate(e.currentTarget.value || day(0))} maw={220} />
       </Stack>
     </Card>
   );
@@ -136,11 +146,42 @@ function DoneTransfers({ rows, name }: { rows: Row[]; name: (id: number) => stri
       <Stack gap="xs">{rows.map((t) => (
         <Group key={t.id} justify="space-between" gap="xs">
           <Text size="sm"><b>{name(Number(t.from_member))}</b> העביר/ה ל<b>{name(Number(t.to_member))}</b> <Text span fw={600} style={{ fontVariantNumeric: 'tabular-nums' }}>{ils(Number(t.amount))}</Text></Text>
-          <Text size="sm" c="dimmed">הועבר ב-{heDate(String(t.date))}</Text>
+          <Text size="sm" c="dimmed">{t.note ? `${t.note} · ` : ''}הועבר ב-{heDate(String(t.date))}</Text>
         </Group>
       ))}</Stack>
     </Card>
   );
+}
+
+// Special payment: someone paid for one or more partners (e.g. Itai paid for Lina). Saved as an expense "הוצאות נוספות".
+function SpecialPayment({ members, onDone }: { members: Row[]; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState<{ description: string; amount: number | ''; paid_by: string | null; for_members: string[]; date: string }>(
+    { description: '', amount: '', paid_by: null, for_members: [], date: day(0) });
+  const [error, setError] = useState('');
+  const opts = members.map((m) => ({ value: String(m.id), label: String(m.name) }));
+  const save = async () => {
+    const missing = [!f.description && 'על מה התשלום', !f.amount && 'סכום', !f.paid_by && 'מי שילם'].filter(Boolean);
+    if (missing.length) return setError(`חסר למילוי: ${missing.join(', ')}`);
+    const { error: e } = await supabase.from('expenses').insert({ date: f.date, description: f.description, amount: f.amount, paid_by: Number(f.paid_by),
+      category: 'הוצאות נוספות', for_members: f.for_members.length ? f.for_members.map(Number) : null });
+    if (e) return setError(`השמירה נכשלה: ${e.message}`);
+    setOpen(false); setError(''); setF({ description: '', amount: '', paid_by: null, for_members: [], date: day(0) }); onDone();
+  };
+  return <>
+    <Button variant="light" onClick={() => setOpen(true)} style={{ alignSelf: 'start' }}>רישום תשלום מיוחד</Button>
+    <Modal opened={open} onClose={() => setOpen(false)} title={<Text fw={600}>תשלום מיוחד</Text>}>
+      <form onSubmit={(e) => { e.preventDefault(); save(); }}><Stack>
+        <TextInput label="על מה התשלום" required value={f.description} onChange={(e) => setF({ ...f, description: e.currentTarget.value })} />
+        <NumberInput label="סכום" required prefix="₪ " thousandSeparator decimalScale={2} min={0} inputMode="decimal" value={f.amount} onChange={(v) => setF({ ...f, amount: v === '' ? '' : Number(v) })} />
+        <Select label="מי שילם" required data={opts} value={f.paid_by} onChange={(v) => setF({ ...f, paid_by: v })} />
+        <MultiSelect label="עבור מי" description="ריק = כל השותפים לפי החלק. אחרת רק מי שנבחר מחזיר בהתחשבנות הבאה" placeholder="כל השותפים" data={opts} value={f.for_members} onChange={(v) => setF({ ...f, for_members: v })} />
+        <TextInput type="date" label="תאריך" value={f.date} onChange={(e) => setF({ ...f, date: e.currentTarget.value || day(0) })} />
+        {error && <Alert color="red">{error}</Alert>}
+        <Button type="submit">שמירה</Button>
+      </Stack></form>
+    </Modal>
+  </>;
 }
 
 function Upcoming({ tasks, ending }: { tasks: Row[]; ending: Row[] }) {

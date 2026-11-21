@@ -1,12 +1,12 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, Badge, Box, Button, Checkbox, Group, Modal, NumberInput, Paper, ScrollArea, Select, Skeleton, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core';
+import { Alert, Badge, Box, Button, Checkbox, Group, Modal, MultiSelect, NumberInput, Paper, ScrollArea, Select, Skeleton, Stack, Table, Text, Textarea, TextInput, Title } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { supabase, ils, type Row, type Value } from '@/lib/supabase';
 
 export interface Field {
   key: string; label: string;
-  type?: 'text' | 'number' | 'percent' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'apartment' | 'tenant' | 'select';
+  type?: 'text' | 'number' | 'percent' | 'money' | 'date' | 'textarea' | 'bool' | 'member' | 'members' | 'apartment' | 'tenant' | 'select';
   options?: string[]; hideInTable?: boolean; noTotal?: boolean; required?: boolean; default?: Value; hint?: string;
 }
 export interface Lookups { members: Row[]; apartments: Row[]; tenants: Row[] }
@@ -33,6 +33,7 @@ function display(f: Field, v: Value, l: Lookups): ReactNode {
   if (f.type === 'bool') return v ? <Badge variant="light" color="green">כן</Badge> : dash;
   if (f.type === 'date') return shortDate(v);
   if (f.type === 'member') return nameOf(l.members, v);
+  if (f.type === 'members') return Array.isArray(v) && v.length ? v.map((id) => nameOf(l.members, id)).join(', ') : dash;
   if (f.type === 'tenant') return nameOf(l.tenants, v);
   if (f.type === 'apartment') return <Badge variant="light" color="sand" radius="sm">{nameOf(l.apartments, v)}</Badge>;
   return String(v);
@@ -200,6 +201,8 @@ function FieldInput({ f, value, lookups, onChange }: { f: Field; value: Value; l
       return <Select {...common} clearable={!f.required} data={rows.map((r) => ({ value: String(r.id), label: String(r.name) }))}
         value={value === null ? null : String(value)} onChange={(v) => onChange(v === null ? null : Number(v))} />;
     }
+    case 'members': return <MultiSelect {...common} data={lookups.members.map((r) => ({ value: String(r.id), label: String(r.name) }))} placeholder="כל השותפים" clearable
+      value={Array.isArray(value) ? value.map(String) : []} onChange={(v) => onChange(v.length ? v.map(Number) : null)} />;
     case 'select': return <Select {...common} data={f.options ?? []} value={value === null ? null : String(value)} onChange={onChange} allowDeselect={false} />;
     default: return <TextInput {...common} value={String(value ?? '')} onChange={(e) => text(e.currentTarget.value)} />;
   }

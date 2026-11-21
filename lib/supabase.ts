@@ -7,7 +7,7 @@ export const supabase = createClient('https://hyeslwlewvvjiyizoduf.supabase.co',
   auth: { flowType: 'pkce', detectSessionInUrl: true, persistSession: true },
 });
 
-export type Value = string | number | boolean | null;
+export type Value = string | number | boolean | number[] | null;
 export type Row = { id: number } & Record<string, Value>;
 
 export const ils = (n: number) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 }).format(n);

@@ -1,6 +1,6 @@
 export interface Member { id: number; name: string; share: number }
 export interface Money { amount: number }
-export interface Expense extends Money { paid_by: number }
+export interface Expense extends Money { paid_by: number; for_members?: number[] | null }
 export interface Rent extends Money { deposited_to: number }
 export interface Transfer extends Money { from_member: number; to_member: number }
 
@@ -11,10 +11,18 @@ export function balances(members: Member[], expenses: Expense[], rents: Rent[], 
   const held = new Map(members.map((m) => [m.id, 0]));
   const add = (id: number, v: number) => held.set(id, (held.get(id) ?? 0) + v);
   for (const r of rents) add(r.deposited_to, Number(r.amount));
-  for (const e of expenses) add(e.paid_by, -Number(e.amount));
+  const own = new Map<number, number>(); // special payments: paid for specific partners only
+  const owe = (id: number, v: number) => own.set(id, (own.get(id) ?? 0) + v);
+  for (const e of expenses) {
+    if (!e.for_members?.length) { add(e.paid_by, -Number(e.amount)); continue; }
+    const group = members.filter((m) => e.for_members!.includes(m.id));
+    const total = group.reduce((s, m) => s + Number(m.share), 0);
+    owe(e.paid_by, Number(e.amount));
+    for (const m of group) owe(m.id, -Number(e.amount) * Number(m.share) / total);
+  }
   for (const t of transfers) { add(t.from_member, -Number(t.amount)); add(t.to_member, Number(t.amount)); }
   const net = [...held.values()].reduce((a, b) => a + b, 0);
-  return new Map(members.map((m) => [m.id, round(Number(m.share) * net - (held.get(m.id) ?? 0))]));
+  return new Map(members.map((m) => [m.id, round(Number(m.share) * net - (held.get(m.id) ?? 0) + (own.get(m.id) ?? 0))]));
 }
 
 export interface Settlement { from: number; to: number; amount: number }

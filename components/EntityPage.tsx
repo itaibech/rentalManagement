@@ -41,7 +41,8 @@ function display(f: Field, v: Value, l: Lookups): ReactNode {
 
 interface Props {
   table: string; title: string; description?: string; fields: Field[]; order: string; ascending?: boolean; addLabel?: string;
-  emptyText?: string; notice?: ReactNode; onChange?: () => void; rowActions?: (row: Row, reload: () => void) => ReactNode; toolbar?: (reload: () => void) => ReactNode; preview?: (values: Partial<Row>, l: Lookups) => ReactNode;
+  emptyText?: string; notice?: ReactNode; onChange?: () => void; rowActions?: (row: Row, reload: () => void) => ReactNode; toolbar?: (reload: () => void) => ReactNode;
+  /** Replace the default table (e.g. group rows). */ render?: (rows: Row[], edit: (r: Row) => void, reload: () => void) => ReactNode; preview?: (values: Partial<Row>, l: Lookups) => ReactNode;
 }
 
 function useRows(table: string, order: string, ascending: boolean) {
@@ -81,8 +82,8 @@ export function EntityPage(p: Props) {
       </Group>
       {p.notice}
       {error && <Alert color="red">{error}</Alert>}
-      <DataTable fields={p.fields} rows={rows === null ? null : filtered} lookups={lookups} onEdit={setEditing} actions={p.rowActions && ((r) => p.rowActions!(r, reload))}
-        empty={rows?.length ? 'אין תוצאות לחיפוש הזה.' : p.emptyText ?? 'עדיין אין כאן כלום. לחצו על הכפתור למעלה כדי להוסיף.'} />
+      {p.render && filtered.length ? p.render(filtered, setEditing, reload) : <DataTable fields={p.fields} rows={rows === null ? null : filtered} lookups={lookups} onEdit={setEditing} actions={p.rowActions && ((r) => p.rowActions!(r, reload))}
+        empty={rows?.length ? 'אין תוצאות לחיפוש הזה.' : p.emptyText ?? 'עדיין אין כאן כלום. לחצו על הכפתור למעלה כדי להוסיף.'} />}
       {editing && <EditModal {...p} lookups={lookups} row={editing} onClose={(changed) => { setEditing(null); if (changed) { reload(); p.onChange?.(); } }} />}
     </Stack>
   );

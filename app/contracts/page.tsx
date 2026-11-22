@@ -1,12 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { Alert, Button, Group, Menu, Text } from '@mantine/core';
+import { Alert, Badge, Button, Card, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core';
 import { AttachmentsButton } from '@/components/Attachments';
 import { EntityPage, useLookups, type Lookups } from '@/components/EntityPage';
 import { Templates } from '@/components/Templates';
-import { nextTerm, templateData, templatePath, type ContractData } from '@/lib/contracts';
+import { heDate, nextTerm, templateData, templatePath, type ContractData } from '@/lib/contracts';
 import { download, fillTemplate, printAsPdf } from '@/lib/docgen';
-import { supabase, type Row } from '@/lib/supabase';
+import { ils, supabase, type Row } from '@/lib/supabase';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -19,7 +19,7 @@ async function makeDoc(c: Row, l: Lookups) {
   return { blob, name: `${c.kind} - ${apt?.name ?? ''} - ${String(c.start_date).slice(0, 4)}` };
 }
 
-function Actions({ c, l, reload, onError }: { c: Row; l: Lookups; reload: () => void; onError: (m: string) => void }) {
+function Actions({ c, l, reload, onError, latest }: { c: Row; l: Lookups; reload: () => void; onError: (m: string) => void; latest: boolean }) {
   const [busy, setBusy] = useState('');
   const run = (key: string, fn: () => Promise<void>) => async () => {
     setBusy(key); onError('');
@@ -42,10 +42,48 @@ function Actions({ c, l, reload, onError }: { c: Row; l: Lookups; reload: () => 
           <Menu.Item onClick={run('doc', async () => { const d = await makeDoc(c, l); await printAsPdf(d.blob, d.name); })}>PDF (הדפסה ושמירה)</Menu.Item>
         </Menu.Dropdown>
       </Menu>
-      <Button size="compact-sm" variant="subtle" loading={busy === 'renew'} onClick={renew}>חידוש לשנה הבאה</Button>
+      {latest && <Button size="compact-sm" variant="subtle" loading={busy === 'renew'} onClick={renew}>חידוש לשנה הבאה</Button>}
       <AttachmentsButton link="contract_id" id={c.id} apartmentId={Number(c.apartment_id)} label="חוזה חתום" />
     </Group>
   );
+}
+
+const period = (c: Row) => `${heDate(String(c.start_date))}–${heDate(String(c.end_date))}`;
+const soon = (c: Row) => String(c.end_date) <= new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
+
+// One card per apartment: original contract + current extension on one line, every year below.
+function ApartmentCard({ list, l, edit, reload, onError }: { list: Row[]; l: Lookups; edit: (r: Row) => void; reload: () => void; onError: (m: string) => void }) {
+  const [latest] = list, original = [...list].reverse().find((c) => c.kind === 'חוזה חדש') ?? list[list.length - 1];
+  const apt = l.apartments.find((a) => a.id === latest.apartment_id), tenant = l.tenants.find((t) => t.id === latest.tenant_id);
+  return (
+    <Card>
+      <Group justify="space-between" align="start" gap="xs">
+        <Stack gap={2}>
+          <Group gap="xs"><Badge variant="light" color="sand" radius="sm">{String(apt?.name ?? '')}</Badge><Text fw={600}>{String(tenant?.name ?? '')}</Text>
+            {soon(latest) && <Badge color={String(latest.end_date) < new Date().toISOString().slice(0, 10) ? 'red' : 'orange'} variant="light">מסתיים ב-{heDate(String(latest.end_date))}</Badge>}</Group>
+          <Text size="sm">חוזה מקורי {period(original)}{latest.id !== original.id && <> · {String(latest.kind)} נוכחית {period(latest)}</>} · <b>{ils(Number(latest.rent))}</b> · {String(latest.status)}</Text>
+        </Stack>
+        <Actions c={latest} l={l} reload={reload} onError={onError} latest />
+      </Group>
+      <details style={{ marginTop: 8 }}>
+        <summary style={{ cursor: 'pointer' }}><Text span size="sm" c="dimmed">כל החוזים וההארכות ({list.length})</Text></summary>
+        <Stack gap={4} mt="xs">{list.map((c) => (
+          <Group key={c.id} justify="space-between" gap="xs" py={4} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
+            <UnstyledButton onClick={() => edit(c)} aria-label={`עריכת ${c.kind} ${period(c)}`}>
+              <Text size="sm"><b>{String(c.kind)}</b> {period(c)} · {ils(Number(c.rent))} · {String(c.status)}</Text></UnstyledButton>
+            <Actions c={c} l={l} reload={reload} onError={onError} latest={false} />
+          </Group>
+        ))}</Stack>
+      </details>
+    </Card>
+  );
+}
+
+function byApartment(rows: Row[]) {
+  const groups = new Map<number, Row[]>();
+  for (const r of rows) groups.set(Number(r.apartment_id), [...(groups.get(Number(r.apartment_id)) ?? []), r]);
+  for (const g of groups.values()) g.sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
+  return [...groups.values()];
 }
 
 export default function Contracts() {
@@ -68,7 +106,7 @@ export default function Contracts() {
       ]}
       toolbar={() => <Templates apartments={lookups.apartments} />}
       notice={error && <Alert color="red" withCloseButton onClose={() => setError('')}>{error}</Alert>}
-      rowActions={(c, reload) => <Actions c={c} l={lookups} reload={reload} onError={setError} />}
+      render={(rows, edit, reload) => <Stack>{byApartment(rows).map((g) => <ApartmentCard key={String(g[0].apartment_id)} list={g} l={lookups} edit={edit} reload={reload} onError={setError} />)}</Stack>}
       emptyText="עדיין אין חוזים. הוסיפו את החוזה הנוכחי של כל דירה, ואז 'חידוש לשנה הבאה' יכין את ההארכה." />
   );
 }

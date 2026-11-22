@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Alert, Badge, Button, Card, Group, Menu, Stack, Text, UnstyledButton } from '@mantine/core';
+import { Alert, Badge, Button, Card, Group, Menu, Modal, Stack, Text, UnstyledButton } from '@mantine/core';
 import { AttachmentsButton } from '@/components/Attachments';
 import { EntityPage, useLookups, type Lookups } from '@/components/EntityPage';
 import { Templates } from '@/components/Templates';
@@ -21,6 +21,8 @@ async function makeDoc(c: Row, l: Lookups) {
 
 function Actions({ c, l, reload, onError, latest }: { c: Row; l: Lookups; reload: () => void; onError: (m: string) => void; latest: boolean }) {
   const [busy, setBusy] = useState('');
+  const [ask, setAsk] = useState(false);
+  const draft = c.status === 'טיוטה';
   const run = (key: string, fn: () => Promise<void>) => async () => {
     setBusy(key); onError('');
     try { await fn(); } catch (e) { onError(e instanceof Error ? e.message : String(e)); }
@@ -33,6 +35,11 @@ function Actions({ c, l, reload, onError, latest }: { c: Row; l: Lookups; reload
     if (error) throw new Error(error.message);
     reload();
   });
+  const remove = run('remove', async () => {
+    const { error } = await supabase.from('contracts').delete().eq('id', c.id);
+    if (error) throw new Error(error.message);
+    setAsk(false); reload();
+  });
   return (
     <Group gap={4} wrap="wrap">
       <Menu>
@@ -42,7 +49,16 @@ function Actions({ c, l, reload, onError, latest }: { c: Row; l: Lookups; reload
           <Menu.Item onClick={run('doc', async () => { const d = await makeDoc(c, l); await printAsPdf(d.blob, d.name); })}>PDF (הדפסה ושמירה)</Menu.Item>
         </Menu.Dropdown>
       </Menu>
-      {latest && <Button size="compact-sm" variant="subtle" loading={busy === 'renew'} onClick={renew}>חידוש לשנה הבאה</Button>}
+      {latest && <Button size="compact-sm" variant="subtle" loading={busy === 'renew'} onClick={renew} disabled={draft}
+        title={draft ? 'כבר יש טיוטת הארכה. חתמו עליה או מחקו אותה לפני חידוש נוסף' : undefined}>חידוש לשנה הבאה</Button>}
+      {draft && !latest && <Button size="compact-sm" variant="subtle" color="red" onClick={() => setAsk(true)}>מחיקה</Button>}
+      <Modal opened={ask} onClose={() => setAsk(false)} title={<Text fw={600}>למחוק את הטיוטה?</Text>} centered>
+        <Stack>
+          <Text size="sm">{String(c.kind)} {period(c)}, {ils(Number(c.rent))}. המחיקה היא לצמיתות.</Text>
+          <Group justify="flex-end"><Button variant="default" onClick={() => setAsk(false)}>ביטול</Button>
+            <Button color="red" loading={busy === 'remove'} onClick={remove}>כן, למחוק</Button></Group>
+        </Stack>
+      </Modal>
       <AttachmentsButton link="contract_id" id={c.id} apartmentId={Number(c.apartment_id)} label="חוזה חתום" />
     </Group>
   );
